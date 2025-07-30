@@ -4,233 +4,192 @@ import sys
 from pathlib import Path
 from web3 import Web3
 
-# Debug information
+# Set working directory to script directory (safe for both CLI and Streamlit)
+if "__file__" in globals():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Debug Info
 st.sidebar.header("🔧 Debug Info")
 st.sidebar.write(f"**Current Directory:** {os.getcwd()}")
 st.sidebar.write(f"**Python Path:** {sys.executable}")
 
-# Check if we're in a Brownie project
-if not os.path.exists("contracts"):
-    st.error("❌ Not in a Brownie project directory!")
-    st.error("Please navigate to your FreelanceX project root directory.")
+# Check Brownie structure
+if not os.path.exists("contracts") or not os.path.exists("build"):
+    st.error("❌ Not in a valid Brownie project directory.")
     st.stop()
 
-if not os.path.exists("build"):
-    st.error("❌ Contracts not compiled!")
-    st.error("Please run: `brownie compile` first.")
+contract_file = Path("build/contracts/FreelanceX.json")
+if not contract_file.exists():
+    st.error("❌ FreelanceX contract not compiled!")
+    st.error("Run: `brownie compile`")
     st.stop()
 
-# Check for compiled FreelanceX contract
-freelancex_build = Path("build/contracts/FreelanceX.json")
-if not freelancex_build.exists():
-    st.error("❌ FreelanceX contract not found in build directory!")
-    st.error("Make sure your contract is named 'FreelanceX' and run: `brownie compile`")
-    st.stop()
-
-st.sidebar.write("✅ Project structure looks good!")
-
-# Try to import the deployed contract
+# Import contract
+FreelanceX = None
 try:
     from brownie import FreelanceX, accounts, network
-    st.sidebar.write("✅ Brownie import successful!")
-except ImportError as e:
-    st.error("⚠️ Could not import FreelanceX from Brownie.")
-    st.error(f"Error details: {str(e)}")
-    st.error("**Troubleshooting:**")
-    st.error("1. Make sure you're in the Brownie project root directory")
-    st.error("2. Run: `brownie compile`")
-    st.error("3. Run: `brownie run scripts/deploy.py`")
-    st.error("4. Ensure your contract is named 'FreelanceX' in FreelanceX.sol")
-    st.stop()
+    st.sidebar.success("✅ Brownie import successful!")
+except ImportError:
+    try:
+        from brownie.project import load
+        from brownie import accounts, network
+        proj = load(".", name="FreelanceX", raise_if_loaded=False)
+        FreelanceX = getattr(proj, "FreelanceX", None)
+        if FreelanceX is None:
+            st.error("❌ Contract 'FreelanceX' not found in loaded project.")
+            st.stop()
+        st.sidebar.success("✅ Fallback project load successful!")
+    except Exception as e:
+        st.error(f"❌ Failed to load contract: {e}")
+        st.stop()
 
-# Connect to Brownie development network
+# Connect to local development network
 def connect():
     try:
-        current_network = network.show_active()
-        if current_network != "development":
-            st.info(f"Current network: {current_network}")
-            st.info("Connecting to development network...")
+        if network.show_active() != "development":
             network.connect("development")
         return accounts
     except Exception as e:
-        st.error(f"⚠️ Network connection error: {str(e)}")
-        st.error("Make sure Ganache is running or use: `brownie console`")
-        return None
+        st.error(f"⚠️ Network error: {e}")
+        st.stop()
 
 accounts_list = connect()
-if accounts_list is None:
+if not accounts_list:
     st.stop()
 
 st.set_page_config(page_title="FreelanceX", layout="wide")
 st.title("🧑‍💻 FreelanceX - Decentralized Freelancing Platform")
 
-# Sidebar for account selection and info
+# Sidebar account info
 with st.sidebar:
     st.header("🔗 Connection Info")
     try:
         st.write(f"**Network:** {network.show_active()}")
-        account = st.selectbox("👛 Select Your Wallet", accounts_list)
-        st.write(f"**Address:** {account}")
+        account_addresses = [acct.address for acct in accounts_list]
+        selected_address = st.selectbox("👛 Select Wallet", account_addresses)
+
+        # Find the actual account object again using its address
+        account = next(acct for acct in accounts_list if acct.address == selected_address)
+
+        st.write(f"**Address:** {selected_address}")
+        st.write(f"**Balance:** {account.balance() / 10**18:.4f} ETH")
+
         st.write(f"**Balance:** {account.balance() / 10**18:.4f} ETH")
     except Exception as e:
-        st.error(f"Connection error: {e}")
+        st.error(f"⚠️ Account error: {e}")
         st.stop()
 
-# Get latest deployed contract
+# Load deployed contract or deploy if missing
 try:
     if len(FreelanceX) == 0:
-        st.error("⚠️ No FreelanceX contracts deployed!")
-        st.error("Please run: `brownie run scripts/deploy.py`")
-        
-        # Option to deploy from the app
-        if st.button("🚀 Deploy Contract Now"):
-            with st.spinner("Deploying contract..."):
+        st.warning("⚠️ No deployed FreelanceX contract found.")
+        if st.button("🚀 Deploy Contract"):
+            with st.spinner("Deploying..."):
                 try:
                     contract = FreelanceX.deploy({'from': account})
-                    st.success(f"✅ Contract deployed at: {contract.address}")
+                    st.success(f"✅ Contract deployed at {contract.address}")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Deployment failed: {e}")
         st.stop()
-    
-    contract = FreelanceX[-1]  # Get the latest deployed contract
-    st.success(f"✅ Connected to FreelanceX contract at: {contract.address}")
-    
+    contract = FreelanceX[-1]
+    st.success(f"✅ Connected to contract at {contract.address}")
 except Exception as e:
-    st.error(f"⚠️ Error getting contract: {str(e)}")
+    st.error(f"❌ Error accessing deployed contract: {e}")
     st.stop()
 
-# Main app layout
+# Main layout
 col1, col2 = st.columns([2, 1])
 
+# LEFT: Post and View Jobs
 with col1:
     st.markdown("---")
-    
-    # 🚀 Post a Job
     st.header("📢 Post a Job")
-    with st.form("post_job_form"):
-        desc = st.text_area("📝 Job Description", placeholder="Describe the job you need done...")
-        eth = st.number_input("💰 Budget in ETH", min_value=0.001, value=0.1, step=0.001, format="%.3f")
-        
-        submitted = st.form_submit_button("📤 Post Job")
-        if submitted:
+    with st.form("post_job"):
+        desc = st.text_area("📝 Job Description", placeholder="Describe your job...")
+        eth = st.number_input("💰 Budget (ETH)", min_value=0.001, value=0.1, step=0.001, format="%.3f")
+        if st.form_submit_button("📤 Post Job"):
             if not desc.strip():
-                st.error("❌ Please enter a job description")
+                st.error("❌ Description cannot be empty.")
             else:
                 try:
-                    with st.spinner("Posting job..."):
-                        budget_wei = Web3.toWei(eth, 'ether')
-                        tx = contract.postJob(desc, {'from': account, 'value': budget_wei})
-                        tx.wait(1)
-                    
-                    st.success("✅ Job posted successfully!")
-                    st.success(f"🧾 Transaction: {tx.txid}")
+                    wei = Web3.to_wei(eth, 'ether')
+                    tx = contract.postJob(desc, {'from': account, 'value': wei})
+                    tx.wait(1)
+                    st.success(f"✅ Job posted! TX: {tx.txid}")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"⚠️ Error: {str(e)}")
-    
+                    st.error(f"Error: {e}")
+
     st.markdown("---")
-    
-    # 🔍 View Jobs
     st.header("📋 All Jobs")
-    
+
     try:
         job_count = contract.getJobCount()
         if job_count == 0:
-            st.info("No jobs posted yet. Be the first to post a job!")
+            st.info("No jobs yet. Be the first to post!")
         else:
-            for job_id in range(job_count):
+            for i in range(job_count):
                 try:
-                    job = contract.getJob(job_id)
-                    
-                    # Create expandable job card
-                    with st.expander(f"Job #{job_id}: {job[3][:50]}..." if len(job[3]) > 50 else f"Job #{job_id}: {job[3]}"):
-                        col_a, col_b = st.columns([2, 1])
-                        
-                        with col_a:
-                            st.write(f"**Description:** {job[3]}")
-                            st.write(f"**Client:** {job[1]}")
-                            st.write(f"**Budget:** {Web3.fromWei(job[4], 'ether')} ETH")
-                            
-                            status_colors = {"0": "🟢 Open", "1": "🟡 In Progress", "2": "✅ Completed"}
-                            st.write(f"**Status:** {status_colors.get(str(job[5]), f'Unknown ({job[5]})')}")
-                            
-                            if job[2] != "0x0000000000000000000000000000000000000000":
-                                st.write(f"**Freelancer:** {job[2]}")
-                        
-                        with col_b:
-                            # Action buttons based on job status and user
-                            if job[5] == 0:  # Open job
-                                if job[1] != account.address:  # Not the client
-                                    if st.button(f"✅ Take Job #{job_id}", key=f"take_{job_id}"):
-                                        try:
-                                            with st.spinner("Taking job..."):
-                                                tx = contract.takeJob(job_id, {'from': account})
-                                                tx.wait(1)
-                                            st.success("🙌 Job taken successfully!")
-                                            st.rerun()
-                                        except Exception as e:
-                                            st.error(f"Error: {e}")
-                            
-                            elif job[5] == 1:  # In progress
-                                if job[1] == account.address:  # Is the client
-                                    if st.button(f"🎉 Complete Job #{job_id}", key=f"complete_{job_id}"):
-                                        try:
-                                            with st.spinner("Completing job..."):
-                                                tx = contract.completeJob(job_id, {'from': account})
-                                                tx.wait(1)
-                                            st.success("🎊 Job completed and payment released!")
-                                            st.rerun()
-                                        except Exception as e:
-                                            st.error(f"Error: {e}")
-                
+                    job = contract.getJob(i)
+                    with st.expander(f"#{i} - {job[3][:50]}..." if len(job[3]) > 50 else f"#{i} - {job[3]}"):
+                        st.write(f"**Description:** {job[3]}")
+                        st.write(f"**Client:** {job[1]}")
+                        st.write(f"**Budget:** {Web3.from_wei(job[4], 'ether')} ETH")
+                        status_map = {0: "🟢 Open", 1: "🟡 In Progress", 2: "✅ Completed"}
+                        st.write(f"**Status:** {status_map.get(job[5], 'Unknown')}")
+                        if job[2] != "0x0000000000000000000000000000000000000000":
+                            st.write(f"**Freelancer:** {job[2]}")
+
+                        # Action buttons
+                        if job[5] == 0 and job[1] != account.address:
+                            if st.button(f"✅ Take Job #{i}", key=f"take_{i}"):
+                                try:
+                                    tx = contract.takeJob(i, {'from': account})
+                                    tx.wait(1)
+                                    st.success("Job taken!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
+                        elif job[5] == 1 and job[1] == account.address:
+                            if st.button(f"🎉 Complete Job #{i}", key=f"complete_{i}"):
+                                try:
+                                    tx = contract.completeJob(i, {'from': account})
+                                    tx.wait(1)
+                                    st.success("Job completed!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
                 except Exception as e:
-                    st.error(f"Error loading job {job_id}: {e}")
-    
+                    st.warning(f"Could not load job #{i}: {e}")
     except Exception as e:
         st.error(f"Error fetching jobs: {e}")
 
+# RIGHT: Stats + Tools
 with col2:
     st.header("📊 Stats")
-    
     try:
-        total_jobs = contract.getJobCount()
-        st.metric("Total Jobs", total_jobs)
-        
-        # Count jobs by status
-        open_jobs = 0
-        in_progress_jobs = 0
-        completed_jobs = 0
-        
-        for job_id in range(total_jobs):
-            try:
-                job = contract.getJob(job_id)
-                if job[5] == 0:
-                    open_jobs += 1
-                elif job[5] == 1:
-                    in_progress_jobs += 1
-                elif job[5] == 2:
-                    completed_jobs += 1
-            except:
-                continue
-        
-        st.metric("🟢 Open Jobs", open_jobs)
-        st.metric("🟡 In Progress", in_progress_jobs)
-        st.metric("✅ Completed", completed_jobs)
-        
+        total = contract.getJobCount()
+        open_, inprog, done = 0, 0, 0
+        for i in range(total):
+            job = contract.getJob(i)
+            if job[5] == 0: open_ += 1
+            elif job[5] == 1: inprog += 1
+            elif job[5] == 2: done += 1
+        st.metric("Total Jobs", total)
+        st.metric("🟢 Open", open_)
+        st.metric("🟡 In Progress", inprog)
+        st.metric("✅ Completed", done)
     except Exception as e:
-        st.error(f"Error loading stats: {e}")
-    
+        st.error(f"Stats error: {e}")
+
     st.markdown("---")
-    st.header("⚙️ Actions")
-    
-    if st.button("🔄 Refresh Data"):
+    st.header("⚙️ Utilities")
+    if st.button("🔄 Refresh"):
         st.rerun()
-    
-    if st.button("📜 View Contract"):
-        st.code(f"Contract Address: {contract.address}")
+    if st.button("📜 Show Contract"):
+        st.code(f"Address: {contract.address}")
         st.code(f"Network: {network.show_active()}")
 
-# Footer
 st.markdown("---")
-st.markdown("**FreelanceX** - Connecting freelancers and clients on the blockchain 🚀")
+st.markdown("🚀 **FreelanceX** — Connecting clients & freelancers on the blockchain.")
