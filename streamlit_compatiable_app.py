@@ -9,27 +9,44 @@ st.set_page_config(page_title="FreelanceX", layout="wide")
 
 def get_web3_connection():
     """Connect to Ethereum network"""
-    # Use public RPC endpoints for different networks
+    # Updated RPC endpoints with better reliability
     networks = {
-        "Sepolia Testnet": "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
-        "Polygon Mumbai": "https://rpc-mumbai.maticvigil.com/",
-        "Ethereum Mainnet": "https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+        "Sepolia Testnet": [
+            "https://rpc.sepolia.org",
+            "https://ethereum-sepolia.blockpi.network/v1/rpc/public",
+            "https://sepolia.gateway.tenderly.co",
+            "https://rpc-sepolia.rockx.com"
+        ],
+        "Polygon Mumbai": [
+            "https://rpc-mumbai.maticvigil.com/",
+            "https://matic-mumbai.chainstacklabs.com"
+        ]
     }
 
     selected_network = st.sidebar.selectbox("🌐 Select Network", list(networks.keys()))
-    rpc_url = networks[selected_network]
+    rpc_urls = networks[selected_network]
 
-    try:
-        w3 = Web3(Web3.HTTPProvider(rpc_url))
-        if w3.is_connected():
-            st.sidebar.success(f"✅ Connected to {selected_network}")
-            return w3, selected_network
-        else:
-            st.sidebar.error("❌ Failed to connect to network")
-            return None, None
-    except Exception as e:
-        st.sidebar.error(f"Connection error: {e}")
-        return None, None
+    # Try multiple RPC endpoints
+    for i, rpc_url in enumerate(rpc_urls):
+        try:
+            w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={'timeout': 10}))
+            if w3.is_connected():
+                st.sidebar.success(f"✅ Connected to {selected_network}")
+                st.sidebar.write(f"**RPC:** {rpc_url}")
+                return w3, selected_network
+            else:
+                if i < len(rpc_urls) - 1:
+                    st.sidebar.warning(f"⚠️ Trying backup RPC...")
+                    continue
+        except Exception as e:
+            if i < len(rpc_urls) - 1:
+                st.sidebar.warning(f"⚠️ RPC {i+1} failed, trying backup...")
+                continue
+            else:
+                st.sidebar.error(f"❌ All RPC endpoints failed: {e}")
+
+    st.sidebar.error("❌ Failed to connect to any network")
+    return None, None
 
 def load_contract_abi():
     """Load the actual FreelanceX contract ABI"""
