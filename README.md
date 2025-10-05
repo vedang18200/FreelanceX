@@ -1,189 +1,228 @@
-# FreelanceX
+# FreelanceX - Decentralized Freelancing Platform
 
-A minimal decentralized freelancing platform built with **Solidity** smart contracts and a **Python/Streamlit** frontend. Post gigs, hire freelancers, and manage job milestones with on-chain transparency.
+A blockchain-based freelancing platform built with Solidity smart contracts and Streamlit frontend, enabling transparent job posting, hiring, and payment processing through smart contracts.
 
-> Tech stack: Solidity (contracts), Python + Streamlit (UI), web3.py (chain interface).  
-> Repo layout includes `contracts/`, `scripts/`, `streamlit_app.py`, and `requirements.txt`. :contentReference[oaicite:0]{index=0}
+## 🎯 Project Overview
 
----
+FreelanceX is a decentralized application (dApp) that connects clients and freelancers through blockchain technology, ensuring transparent transactions and eliminating intermediary fees.
 
-## ✨ Features
+### Key Features
+- **Smart Contract Jobs**: Post and manage jobs on-chain
+- **Escrow System**: Automatic payment holding and release
+- **Multi-Account Support**: Switch between different wallet accounts
+- **Real-time Stats**: Track job statistics and platform metrics
+- **Local Development**: Full Brownie integration for testing
 
-- Create & browse freelance jobs
-- Client ↔️ Freelancer workflows
-- On-chain state for jobs/milestones
-- Basic escrow flow (deposit → delivery → release/refund)
-- Simple, clean Streamlit UI
+## 🏗️ Architecture
 
-> Languages in this repo are primarily Python and Solidity. :contentReference[oaicite:1]{index=1}
+### Tech Stack
+- **Smart Contracts**: Solidity (Ethereum/Sepolia)
+- **Development Framework**: Brownie
+- **Frontend**: Python + Streamlit
+- **Blockchain Interaction**: Web3.py
+- **Testing**: Brownie testing framework
 
----
+### Contract Structure
+```solidity
+contract FreelanceX {
+    struct Job {
+        uint256 id;
+        address payable client;
+        address payable freelancer;
+        string description;
+        uint256 budget;
+        Status status;
+    }
 
-## 📦 Project Structure
+    enum Status { Open, InProgress, Completed }
+}
+```
 
+## 📁 Project Structure
+
+```
 FreelanceX/
-├─ contracts/ # Solidity smart contracts
-├─ scripts/ # Helper scripts (deploy/interact)
-├─ streamlit_app.py # Streamlit frontend
-├─ requirements.txt # Python dependencies
-└─ README.md
+├── contracts/
+│   └── FreelanceX.sol          # Main smart contract
+├── scripts/
+│   └── deploy.py               # Deployment script
+├── tests/
+│   └── test_freelancex.py      # Contract tests
+├── build/
+│   └── contracts/              # Compiled contracts (auto-generated)
+├── streamlit_app.py            # Main frontend application
+├── brownie-config.yaml         # Brownie configuration
+├── requirements.txt            # Python dependencies
+└── README.md                   # This file
+```
 
-> Directories and key files confirmed in the repository listing. :contentReference[oaicite:2]{index=2}
+## 🚀 Quick Start
 
----
+### Prerequisites
+- Python 3.8+
+- Node.js (for Brownie)
+- Git
 
-## 🚀 Quick Start (Local)
+### Installation
 
-### 1) Prereqs
-- Python 3.10+  
-- Node.js (only if you use Hardhat)  
-- A local Ethereum RPC (Anvil, Hardhat, or Ganache)
-
-### 2) Install Python deps
+1. **Clone Repository**
 ```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+git clone https://github.com/vedang18200/FreelanceX.git
+cd FreelanceX
+```
+
+2. **Install Dependencies**
+```bash
 pip install -r requirements.txt
-3) Start a local chain
 ```
 
-Hardhat
-```
-npm i -g hardhat
-npx hardhat node
-```
-
-Ganache
-```
-npm i -g ganache
-ganache
-```
-4) Deploy contracts
-
-Use the scripts in scripts/ (names may vary). Common patterns:
-
-# Example: Python deploy (web3.py)
-```
-python scripts/deploy.py
-# or
-python scripts/deploy_contracts.py
+3. **Install Brownie**
+```bash
+pip install eth-brownie
 ```
 
-Capture the printed contract address (e.g., FreelanceX/JobManager) for the frontend config.
+4. **Compile Contracts**
+```bash
+brownie compile
+```
 
-If your deploy script name differs, check the scripts/ folder and adjust accordingly. 
-GitHub
+5. **Run Local Blockchain**
+```bash
+brownie console
+# This starts local Ganache instance
+```
 
-5) Configure environment
+6. **Deploy Contract**
+```bash
+brownie run scripts/deploy.py
+```
 
-Create a .env in the project root:
-
-# RPC and account (dev only; use test keys)
-```
-WEB3_PROVIDER_URI=http://127.0.0.1:8545
-PRIVATE_KEY=0xYOUR_LOCAL_DEV_PRIVATE_KEY
-```
-# Contract linkage for the UI
-```
-CONTRACT_ADDRESS=0xDeployedContractAddress
-```
-# Either paste ABI JSON directly or point to a file path
-```
-CONTRACT_ABI_PATH=./contracts/build/FreelanceX.json
-```
-# Streamlit (optional)
-```
-STREAMLIT_SERVER_PORT=8501
-```
-Never commit real private keys. Use local/test keys only.
-
-6) Run the app
-```
+7. **Launch Frontend**
+```bash
 streamlit run streamlit_app.py
 ```
-🧭 How It Works
 
-Client creates a job with budget → funds escrow.
+## 💼 Usage Workflow
 
-Freelancer applies/accepts → starts work.
+### For Clients
+1. **Connect Wallet**: Select account from sidebar
+2. **Post Job**: Fill description and set budget in ETH
+3. **Wait for Applications**: Freelancers can take your job
+4. **Complete Job**: Mark job as complete to release payment
 
-Milestones can be marked complete.
+### For Freelancers
+1. **Browse Jobs**: View all available jobs
+2. **Take Job**: Click "Take Job" on open positions
+3. **Work & Deliver**: Complete the work as described
+4. **Get Paid**: Client marks complete and payment is released
 
-Client releases escrow (or disputes → refund path, if implemented).
-
-All critical state is on-chain via the Solidity contracts in contracts/.
-
-🔧 Development Notes
-
-Prefer running against a local chain first (Anvil/Hardhat/Ganache).
-
-If targeting a public testnet (e.g., Sepolia/Amoy), set WEB3_PROVIDER_URI and fund your dev account with test ETH/MATIC.
-
-After each re-deploy, update CONTRACT_ADDRESS and (if ABI changed) CONTRACT_ABI_PATH for the Streamlit app.
-
-Typical Python modules used here: web3, python-dotenv, streamlit (see requirements.txt). 
-GitHub
-
-🧪 Testing
-
-Add unit tests for contracts (Foundry/Hardhat) and integration tests for Python/web3 flows.
-
-Example (Foundry):
+### Platform Flow
 ```
-forge test
+Client Posts Job → Freelancer Takes Job → Work Completion → Payment Release
+      ↓                    ↓                     ↓              ↓
+   [Open]            [In Progress]         [In Progress]   [Completed]
 ```
 
-Example (Hardhat):
+## 🔧 Development
+
+### Local Testing
+```bash
+# Compile contracts
+brownie compile
+
+# Run tests
+brownie test
+
+# Deploy to local network
+brownie run scripts/deploy.py
+
+# Launch Streamlit app
+streamlit run streamlit_app.py
 ```
-npx hardhat test
+
+### Network Configuration
+- **Local**: Ganache (automatic with Brownie)
+- **Testnet**: Sepolia (configured in brownie-config.yaml)
+- **Mainnet**: Ethereum (for production)
+
+## 📊 Smart Contract Functions
+
+### Core Functions
+- `postJob(string _description)`: Create new job with ETH budget
+- `takeJob(uint256 _jobId)`: Freelancer accepts job
+- `completeJob(uint256 _jobId)`: Client marks job complete
+- `getJob(uint256 _jobId)`: Retrieve job details
+- `getAllJobs()`: Get all jobs array
+- `getJobCount()`: Get total number of jobs
+
+### Events
+- `JobPosted(uint256 jobId, address client, string description, uint256 budget)`
+- `JobTaken(uint256 jobId, address freelancer)`
+- `JobCompleted(uint256 jobId)`
+
+## 🧪 Testing
+
+### Contract Tests
+```bash
+brownie test -v
 ```
-🔐 Security
 
-Do not use mainnet with un-audited contracts or real funds.
+### Frontend Testing
+```bash
+streamlit run streamlit_app.py
+# Navigate to http://localhost:8501
+```
 
-Keep secrets in .env and out of version control.
+## 📈 Current Status
 
-Consider multisig for admin roles and timelocks for upgrades (if you add them later).
+### Implemented Features ✅
+- [x] Smart contract development
+- [x] Local Brownie integration
+- [x] Streamlit frontend
+- [x] Job posting/taking/completion
+- [x] Multi-account wallet support
+- [x] Real-time statistics
+- [x] Local development environment
 
-📄 License
+### Future Enhancements 🚧
+- [ ] Dispute resolution system
+- [ ] Rating and review system
+- [ ] Multiple payment tokens
+- [ ] Advanced filtering and search
+- [ ] Mobile-responsive design
+- [ ] IPFS integration for file sharing
 
-MIT (recommended). Create a LICENSE file or update this section with your chosen license.
+## 🔐 Security Considerations
 
-🙌 Contributing
+- **Escrow Protection**: Funds locked until job completion
+- **Access Control**: Only clients can complete their jobs
+- **State Management**: Proper job status transitions
+- **Input Validation**: Description and amount checks
 
-PRs and issues are welcome:
+## 🤝 Contributing
 
-Keep PRs small and focused.
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-Add tests for any contract or logic change.
+## 📄 License
 
-Update this README when you change setup steps.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-🗺️ Roadmap (suggested)
+## 👥 Team
 
-Role-based dashboards (Client/Freelancer)
+- **Developer**: Vedang Deshmukh
+- **GitHub**: [@vedang18200](https://github.com/vedang18200)
 
-Dispute resolution module
+## 📞 Support
 
-Milestone-based partial releases
+For support and questions:
+- Create an issue on GitHub
+- Check documentation in `/docs` folder
+- Review test files for usage examples
 
-Reputation/ratings on-chain or hybrid
+---
 
-IPFS/Arweave for deliverables metadata
-
-Email/Telegram notifications via webhooks
-
-💬 Support
-
-Open an issue on GitHub with:
-
-Environment (OS, Python version)
-
-Chain (local/testnet), steps to reproduce
-
-Logs/screenshots
-
-
-If you want, I can also add a **badges row**, a **diagram**, or wire up a ready-to-use `deploy.py` that matches your current contracts—just say the word.
-::contentReference[oaicite:7]{index=7}
+**FreelanceX** - Revolutionizing freelancing through blockchain technology 🚀
